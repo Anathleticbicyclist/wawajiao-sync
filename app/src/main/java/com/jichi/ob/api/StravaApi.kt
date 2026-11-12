@@ -164,18 +164,53 @@ class StravaApi(
             if (code == 429) throw RateLimitedException("Strava 上传被限流(429)，请稍后再试")
             if (code !in 200..299) throw Exception("Strava 上传失败(HTTP $code): ${body.take(120)}")
 
-            val json = try { JSONObject(body) } catch (_: Exception) { JSONObject() }
-            val err = json.optString("error", "")
+            // 真机实测：POST /upload/files 成功时返回的是 JSON **数组**
+            //   [{"id":22126204676,"id_str":"22126204676","progress":0,"workflow":"new","error":null}]
+            // 旧实现按对象解析，遇到数组直接抛异常被 catch 掉，于是误报「未返回 upload id」。
+            val json = parseUploadJson(body)
+            val err = cleanNullField(json.optString("error", ""))
             if (err.isNotEmpty()) throw Exception("Strava 上传失败: $err")
             val id = json.optString("id", "")
+                .ifEmpty { json.optString("id_str", "") }
                 .ifEmpty { json.optJSONObject("data")?.optString("id", "") ?: "" }
                 .ifEmpty { json.optJSONObject("upload")?.optString("id", "") ?: "" }
-            if (id.isEmpty()) throw Exception("Strava 未返回 upload id: ${body.take(120)}")
+                .ifEmpty {
+                    // 兜底：极端形态变化时直接从原文抓第一个 id（不依赖 JSON 结构）
+                    Regex("\"id(_str)?\"\\s*:\\s*\"?(\\d+)").find(body)
+                        ?.groupValues?.getOrNull(2)?.takeIf { it.isNotEmpty() } ?: ""
+                }
+            if (id.isEmpty()) throw Exception("Strava 未返回 upload id: ${body.take(160)}")
             Log.d(TAG, "postFiles ok, id=$id")
             return id
         } finally {
             conn.disconnect()
         }
+    }
+
+    /**
+     * 容忍三种返回形态：对象 `{...}`、数组 `[{...}]`（真机实测形态）、以及带包装的对象 `{data:{...}}`。
+     * 数组时取第一个元素；解析失败返回空对象，由调用方按「未返回 upload id」报错。
+     */
+    private fun parseUploadJson(body: String): JSONObject {
+        val t = body.trim()
+        return try {
+            when {
+                t.startsWith("[") -> JSONArray(t).optJSONObject(0) ?: JSONObject()
+                t.startsWith("{") -> JSONObject(t)
+                else -> JSONObject()
+            }
+        } catch (_: Exception) {
+            JSONObject()
+        }
+    }
+
+    /**
+     * 清洗 JSON 空值：Android 版 org.json 对 `"error": null` 的 optString 会返回字面量 `"null"`，
+     * 而纯 JVM 版（单测用的 org.json:json）返回空串——不统一就会「单测通过、真机误判失败」。
+     */
+    private fun cleanNullField(s: String): String {
+        val t = s.trim()
+        return if (t.equals("null", ignoreCase = true)) "" else t
     }
 
     private fun poll(cookie: String, id: String, intervalMs: Long, maxTimes: Int): Result {
@@ -209,14 +244,14 @@ class StravaApi(
                 val status = (item?.optString("status", "") ?: "").lowercase()
                 lastStatus = status.ifEmpty { "processing" }
                 lastProgress = item?.optDouble("progress", 0.0) ?: 0.0
-                Log.d(TAG, "poll $attempt/$maxTimes status=$status progress=$lastProgress")
+                // 真机形态不带 status 字段，错误信息放在 error 里（null 表示无错）
+                val errText = cleanNullField(item?.optString("error", "") ?: "")
+                Log.d(TAG, "poll $attempt/$maxTimes status=$status progress=$lastProgress error=$errText")
                 when {
+                    status in listOf("error", "failed", "invalid") || errText.isNotEmpty() ->
+                        return Result(false, message = "Strava 处理失败: ${errText.ifEmpty { status }}")
                     status in listOf("complete", "completed", "done", "success") || lastProgress >= 1.0 ->
                         return Result(true, message = "Strava 上传完成")
-                    status in listOf("error", "failed", "invalid") -> {
-                        val err = item?.optString("error", "") ?: ""
-                        return Result(false, message = "Strava 处理失败: ${err.ifEmpty { status }}")
-                    }
                     status == "duplicate" -> return Result(false, skipped = true, message = "Strava 已存在该活动")
                 }
             } finally {

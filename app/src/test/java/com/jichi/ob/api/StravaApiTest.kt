@@ -1,7 +1,5 @@
 package com.jichi.ob.api
 
-import com.sun.net.httpserver.HttpExchange
-import com.sun.net.httpserver.HttpServer
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -9,16 +7,26 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.BufferedInputStream
+import java.io.ByteArrayOutputStream
 import java.net.InetAddress
+import java.net.ServerSocket
+import java.net.Socket
+import java.net.SocketException
 import java.nio.charset.StandardCharsets
 
 /**
  * StravaApi 协议层 JVM 单元测试。
  *
- * 用 JDK 自带的 [HttpServer] 监听 127.0.0.1 随机端口充当假 Strava，逐个验证：
+ * 假 Strava 只用 java.net.ServerSocket + java.net.Socket 手写极简 HTTP/1.1 服务
+ * （AGP JVM 单测编译以 android.jar 为 bootclasspath，其中没有 com.sun.net.httpserver，
+ *  故不能使用 JDK 的 HttpServer；ServerSocket/Socket 在 android.jar 中存在）。
+ * 绑 127.0.0.1:0 随机端口，每个用例独立实例，用完 stop 释放端口，不留常驻监听。
+ *
+ * 覆盖：
  *  - 三步协议（取 CSRF → multipart 上传 → 轮询进度）
  *  - multipart 段名 / 字段值 / 请求头（Cookie、X-CSRF-Token、X-Requested-With 等）
- *  - 轮询三态：complete 成功 / error 失败取文案 / processing 轮询上限 pending
+ *  - 轮询三态：complete 成功 / error 失败取文案 / processing 轮询上限 pending / duplicate 跳过
  *  - 302 登录失效兜底；checkSession 200 / 302 / 空 cookie 三分支
  *  - fingerprint 的稳定性、差异性与 `md5:size` 格式
  *  - onStep 逐步回调确实出现 ①②③ 三个阶段标记
@@ -38,65 +46,153 @@ class StravaApiTest {
             headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
     }
 
-    /** 假 Strava：只绑 127.0.0.1:0（随机端口），每个用例独立实例，用完 stop，不留常驻端口 */
+    /**
+     * 极简 HTTP/1.1 假服务器：
+     *  - 后台 accept 线程 daemon；每个连接独立 daemon 线程处理；
+     *  - 按 Content-Length 读满请求体（multipart 包体较大，不能只读行）；
+     *  - 响应固定 `Content-Length` + `Connection: close`，不用 chunked。
+     */
     private class FakeStrava(
         var selectStatus: Int = 200,
-        var csrf: String = "csrf-token-abc123XYZ",
+        var csrf: String = "FAKE_CSRF",
         var progressBody: String = """[{"status":"complete"}]"""
     ) {
+        private val requestsLock = Any()
         val requests = mutableListOf<RecordedRequest>()
-        private val server: HttpServer =
-            HttpServer.create(InetAddress.getByName("127.0.0.1"), 0).apply {
-                createContext("/upload/select") { handleSelect(it) }
-                createContext("/upload/files") { handleFiles(it) }
-                createContext("/upload/progress.json") { handleProgress(it) }
-                executor = null
-                start()
-            }
-        val port: Int get() = server.address.port
+
+        private val serverSocket =
+            ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
+        @Volatile private var running = true
+        private val acceptThread = Thread({ acceptLoop() }, "fake-strava-accept").apply {
+            isDaemon = true
+            start()
+        }
+
+        val port: Int get() = serverSocket.localPort
         val baseUrl: String get() = "http://127.0.0.1:$port"
 
-        private fun record(ex: HttpExchange, body: String) {
-            val headerMap = LinkedHashMap<String, String>()
-            ex.requestHeaders.forEach { (k, v) -> headerMap[k] = v.joinToString(",") }
-            requests.add(RecordedRequest(ex.requestMethod, ex.requestURI.rawPath, headerMap, body))
-        }
-
-        private fun readBody(ex: HttpExchange): String {
-            val bytes = ex.requestBody.use { it.readBytes() }
-            return bytes.toString(StandardCharsets.UTF_8)
-        }
-
-        private fun respond(ex: HttpExchange, code: Int, body: String) {
-            val bytes = body.toByteArray(StandardCharsets.UTF_8)
-            ex.sendResponseHeaders(code, bytes.size.toLong())
-            ex.responseBody.use { it.write(bytes) }
-            ex.close()
-        }
-
-        private fun handleSelect(ex: HttpExchange) {
-            record(ex, readBody(ex))
-            if (selectStatus in 300..399) {
-                ex.responseHeaders.set("Location", "/login")
-                ex.sendResponseHeaders(selectStatus, -1)
-                ex.close()
-                return
+        private fun acceptLoop() {
+            while (running) {
+                val client = try {
+                    serverSocket.accept()
+                } catch (_: SocketException) {
+                    break
+                }
+                Thread({ handleClient(client) }, "fake-strava-conn").apply {
+                    isDaemon = true
+                    start()
+                }
             }
-            val html = """<html><head><meta name="csrf-token" content="$csrf"></head></html>"""
-            respond(ex, 200, html)
         }
 
-        private fun handleFiles(ex: HttpExchange) {
-            record(ex, readBody(ex))
-            respond(ex, 200, """{"id":"up_123"}""")
+        private fun handleClient(socket: Socket) {
+            socket.use {
+                val bis = BufferedInputStream(socket.getInputStream())
+                // 1) 请求行：METHOD PATH HTTP/1.1
+                val requestLine = readLine(bis) ?: return
+                val parts = requestLine.split(" ")
+                if (parts.size < 2) return
+                val method = parts[0]
+                val path = parts[1]
+
+                // 2) 请求头，读到空行
+                val headers = LinkedHashMap<String, String>()
+                while (true) {
+                    val line = readLine(bis) ?: break
+                    if (line.isEmpty()) break
+                    val idx = line.indexOf(':')
+                    if (idx > 0) {
+                        headers[line.substring(0, idx).trim()] =
+                            line.substring(idx + 1).trim()
+                    }
+                }
+
+                // 3) 按 Content-Length 读满请求体
+                val bodyLen = headers["Content-Length"]?.toIntOrNull() ?: 0
+                val body = if (bodyLen > 0) {
+                    val buf = ByteArray(bodyLen)
+                    var off = 0
+                    while (off < bodyLen) {
+                        val n = bis.read(buf, off, bodyLen - off)
+                        if (n == -1) break
+                        off += n
+                    }
+                    buf.toString(StandardCharsets.UTF_8)
+                } else ""
+
+                synchronized(requestsLock) {
+                    requests.add(RecordedRequest(method, path, headers, body))
+                }
+
+                // 4) 按路径回预设响应
+                val (code, respBody, contentType) = when {
+                    path.startsWith("/upload/select") -> {
+                        if (selectStatus in 300..399) {
+                            Triple(selectStatus, "", "text/plain; charset=utf-8")
+                        } else {
+                            val html = """<html><head><meta name="csrf-token" content="$csrf"></head></html>"""
+                            Triple(200, html, "text/html; charset=utf-8")
+                        }
+                    }
+                    // 真机实测形态：POST /upload/files 成功返回 JSON 数组（不是对象），
+                    // 且 id 是超出 Int 范围的数字。旧解析按对象处理会误报「未返回 upload id」。
+                    path.startsWith("/upload/files") ->
+                        Triple(
+                            200,
+                            """[{"id":22126204676,"id_str":"22126204676","name":null,"progress":0,"workflow":"new","start_date":null,"error":null}]""",
+                            "application/json"
+                        )
+                    path.startsWith("/upload/progress.json") ->
+                        Triple(200, progressBody, "application/json")
+                    else -> Triple(404, "not found", "text/plain")
+                }
+
+                val head = (
+                    "HTTP/1.1 $code ${reasonPhrase(code)}\r\n" +
+                        "Content-Length: ${respBody.toByteArray(StandardCharsets.UTF_8).size}\r\n" +
+                        "Content-Type: $contentType\r\n" +
+                        "Connection: close\r\n\r\n"
+                    ).toByteArray(StandardCharsets.UTF_8)
+                val out = socket.getOutputStream()
+                out.write(head)
+                out.write(respBody.toByteArray(StandardCharsets.UTF_8))
+                out.flush()
+            }
         }
 
-        private fun handleProgress(ex: HttpExchange) {
-            record(ex, readBody(ex))
-            respond(ex, 200, progressBody)
+        /** 从 BufferedInputStream 读一行（\r\n 或 \n），EOF 返回 null */
+        private fun readLine(bis: BufferedInputStream): String? {
+            val buf = ByteArrayOutputStream()
+            while (true) {
+                val c = bis.read()
+                if (c == -1) {
+                    return if (buf.size() == 0) null
+                    else buf.toString(StandardCharsets.UTF_8)
+                }
+                if (c == '\r'.code) {
+                    val n = bis.read()
+                    if (n == '\n'.code) break
+                    buf.write(c)
+                    if (n != -1) buf.write(n)
+                } else {
+                    buf.write(c)
+                }
+            }
+            return buf.toString(StandardCharsets.UTF_8)
         }
 
-        fun stop() = server.stop(0)
+        private fun reasonPhrase(code: Int): String = when (code) {
+            200 -> "OK"
+            302 -> "Found"
+            404 -> "Not Found"
+            else -> "Internal Server Error"
+        }
+
+        fun stop() {
+            running = false
+            try { serverSocket.close() } catch (_: Exception) {}
+            acceptThread.join(500)
+        }
     }
 
     private fun apiOf(fake: FakeStrava) = StravaApi(fake.baseUrl)
@@ -109,7 +205,9 @@ class StravaApiTest {
 
     @Test
     fun `upload 成功路径 三阶段齐全 multipart 与请求头断言到位`() = runBlocking {
-        val fake = FakeStrava()
+        // 真机形态：POST /upload/files 与 progress.json 响应都带 "error":null，
+        // 即便如此 upload() 仍必须 success=true（拦住 "null" 字面量被误判成失败的回归）。
+        val fake = FakeStrava(progressBody = """[{"status":"complete","error":null}]""")
         val steps = mutableListOf<String>()
         try {
             val api = apiOf(fake)
@@ -128,9 +226,9 @@ class StravaApiTest {
             assertFalse(result.skipped)
 
             // 三阶段各发生一次：GET select、POST files、GET progress
-            val selects = fake.requests.filter { it.path == "/upload/select" }
-            val posts = fake.requests.filter { it.path == "/upload/files" }
-            val polls = fake.requests.filter { it.path == "/upload/progress.json" }
+            val selects = fake.requests.filter { it.path.startsWith("/upload/select") }
+            val posts = fake.requests.filter { it.path.startsWith("/upload/files") }
+            val polls = fake.requests.filter { it.path.startsWith("/upload/progress.json") }
             assertEquals("取 CSRF 只应请求一次", 1, selects.size)
             assertEquals("文件上传只应 POST 一次", 1, posts.size)
             assertEquals("成功路径轮询一次即结束", 1, polls.size)
@@ -156,7 +254,8 @@ class StravaApiTest {
                 "Referer 应指向 /upload/select",
                 post.header("Referer")?.endsWith("/upload/select") == true
             )
-            assertEquals("Origin 应为假服务器根地址", fake.baseUrl, post.header("Origin"))
+            // 注：JDK HttpURLConnection 传输层会剥离 Origin 头（实测 Cookie/Referer/X-* 均可达，
+            // 仅 Origin 不到达），故 JVM 单测无法观测 Origin；生产 Android 端是否携带需真机验证。
 
             // —— 原始 multipart 体断言（对捕获 body 字符串做 contains） ——
             val body = post.body
@@ -185,6 +284,14 @@ class StravaApiTest {
             assertTrue(
                 "authenticity_token 段的值应为 csrf，实际段内容: $tokenPart",
                 tokenPart.contains("\r\n\r\n${fake.csrf}\r\n")
+            )
+
+            // 真机原样：POST /upload/files 成功响应是 JSON 数组
+            //   [{"id":22126204676,"id_str":"22126204676",...,"error":null}]
+            // 这里断言数组里的 id 被 parseUploadJson 正确取出（旧对象解析实现会误报「未返回 id」）。
+            assertTrue(
+                "应从数组形态 POST 响应中拿到 upload id 22126204676，步骤日志: $steps",
+                steps.any { it.contains("22126204676") }
             )
         } finally {
             fake.stop()
@@ -240,6 +347,31 @@ class StravaApiTest {
     }
 
     @Test
+    fun `轮询 complete 但带 error 文案 仍判失败并带文案`() = runBlocking {
+        val fake = FakeStrava(
+            progressBody = """[{"status":"complete","error":"gps gap"}]"""
+        )
+        try {
+            val result = apiOf(fake).upload(
+                cookie = "session=abc",
+                data = fitBytes,
+                fileName = "xxx.fit",
+                intervalMs = 500,
+                maxTimes = 3
+            )
+            assertFalse("带 error 文案不能判成成功", result.success)
+            assertFalse(result.pending)
+            assertFalse(result.skipped)
+            assertTrue(
+                "message 必须包含 error 文案 gps gap，实际: ${result.message}",
+                result.message.contains("gps gap")
+            )
+        } finally {
+            fake.stop()
+        }
+    }
+
+    @Test
     fun `轮询一直 processing 到上限 判定 pending 且不能算成功`() = runBlocking {
         val fake = FakeStrava(
             progressBody = """[{"status":"processing","progress":0.2}]"""
@@ -257,7 +389,7 @@ class StravaApiTest {
             assertFalse(result.skipped)
 
             // maxTimes=1 只应轮询一次
-            val polls = fake.requests.filter { it.path == "/upload/progress.json" }
+            val polls = fake.requests.filter { it.path.startsWith("/upload/progress.json") }
             assertEquals(1, polls.size)
         } finally {
             fake.stop()
@@ -306,15 +438,16 @@ class StravaApiTest {
             }
             assertTrue("登录失效不应向外抛异常", thrown == null)
             assertNotNull(result)
-            assertFalse(result!!.success)
-            assertFalse(result.pending)
+            val r = result!!
+            assertFalse(r.success)
+            assertFalse(r.pending)
             assertTrue(
-                "message 应含「登录」或「失效」字样，实际: ${result.message}",
-                result.message.contains("登录") || result.message.contains("失效")
+                "message 应含「登录」或「失效」字样，实际: ${r.message}",
+                r.message.contains("登录") || r.message.contains("失效")
             )
             // 302 发生在取 CSRF 阶段，不应再发上传 / 轮询请求
-            assertEquals(0, fake.requests.count { it.path == "/upload/files" })
-            assertEquals(0, fake.requests.count { it.path == "/upload/progress.json" })
+            assertEquals(0, fake.requests.count { it.path.startsWith("/upload/files") })
+            assertEquals(0, fake.requests.count { it.path.startsWith("/upload/progress.json") })
         } finally {
             fake.stop()
         }
