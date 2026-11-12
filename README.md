@@ -1,7 +1,7 @@
 # 哇哇叫 · 运动数据同步工具
 
 <p align="center">
-  <img src="docs/logo.png" alt="哇哇叫" width="120">
+  <img src="docs/logo-wawajiao.png" alt="哇哇叫" width="120">
 </p>
 
 **把散落在各处的骑行 / 跑步记录，统一同步到 Outbase 或 Strava。**
