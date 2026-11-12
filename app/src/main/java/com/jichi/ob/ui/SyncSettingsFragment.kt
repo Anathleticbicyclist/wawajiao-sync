@@ -1,0 +1,475 @@
+package com.jichi.ob.ui
+
+import android.content.Intent
+import android.net.Uri
+import android.os.Bundle
+import android.provider.DocumentsContract
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.style.AbsoluteSizeSpan
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.GridLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.fragment.app.Fragment
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.slider.Slider
+import com.google.android.material.switchmaterial.SwitchMaterial
+import com.jichi.ob.R
+import com.jichi.ob.model.DataSource
+import com.jichi.ob.model.UploadSupport
+import com.jichi.ob.util.PrefsManager
+
+/**
+ * 设置页 数据同步设置：数据来源【可多选】→ 同步目标【Outbase / Strava 二选一单选】
+ */
+class SyncSettingsFragment : Fragment() {
+
+    private lateinit var prefs: PrefsManager
+    private lateinit var gridSource: GridLayout
+    private lateinit var gridTarget: GridLayout
+    // 数据来源多选
+    private val selectedSourceTags = LinkedHashSet<String>()
+    // 同步目标：Outbase / Strava 严格二选一单选（运行期状态，持久化在 PrefsManager，默认 Outbase）
+    private var selectedTargetTag: String = DataSource.OUTBASE.shortName
+
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+        return inflater.inflate(R.layout.fragment_sync_settings, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        prefs = PrefsManager(requireContext())
+        gridSource = view.findViewById(R.id.gridSource)
+        gridTarget = view.findViewById(R.id.gridTarget)
+        // fragment可见时刷新登录状态（登录/注销后切回本页自动刷新）
+        lifecycle.addObserver(object : androidx.lifecycle.LifecycleEventObserver {
+            override fun onStateChanged(source: androidx.lifecycle.LifecycleOwner, event: androidx.lifecycle.Lifecycle.Event) {
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) refreshLoginState()
+            }
+        })
+
+        val sliderCount = view.findViewById<Slider>(R.id.sliderCount)
+        val tvCount = view.findViewById<TextView>(R.id.tvCount)
+        val sliderSkip = view.findViewById<Slider>(R.id.sliderSkip)
+        val tvSkip = view.findViewById<TextView>(R.id.tvSkip)
+        val switchMageneQiniu = view.findViewById<SwitchMaterial>(R.id.switchMageneQiniu)
+        val switchMageneFitContent = view.findViewById<SwitchMaterial>(R.id.switchMageneFitContent)
+        val switchForce = view.findViewById<SwitchMaterial>(R.id.switchForceRetransmit)
+
+        sliderCount.addOnChangeListener { _, v, _ -> tvCount.text = v.toInt().toString() }
+        sliderSkip.addOnChangeListener { _, v, _ -> tvSkip.text = v.toInt().toString() }
+        tvCount.setOnClickListener { showInputDialog("同步数量", sliderCount, tvCount, 1, 1000) }
+        tvSkip.setOnClickListener { showInputDialog("跳过前N条", sliderSkip, tvSkip, 0, 10000) }
+        // v8.5.9: 迈金坐标转换拆分为两个通道独立开关
+        switchMageneQiniu.setOnCheckedChangeListener { _, checked -> prefs.setMageneQiniuGcj02Convert(checked) }
+        switchMageneFitContent.setOnCheckedChangeListener { _, checked -> prefs.setMageneFitContentGcj02Convert(checked) }
+        switchForce.setOnCheckedChangeListener { _, checked ->
+            prefs.setForceRetransmit(checked)
+            updateForceRetransmitState()
+        }
+
+        setupSourceButtons()
+        setupTargetButtons()
+        updateSourceChips()
+        restoreSettings(view)
+        updateForceRetransmitState()
+
+        // v8.1.2: 点击"打开目录"跳转到存储目录，查看已保存的FIT/GPX文件
+        view.findViewById<TextView>(R.id.btnOpenSaveDir)?.setOnClickListener { openSaveDir() }
+
+        // v9.2.0: 时区修正设置入口（按平台设置当天/历史时区调整，移植开发版v9.2.2）
+        view.findViewById<TextView>(R.id.btnStravaEntry)?.setOnClickListener {
+            startActivity(Intent(requireContext(), StravaSettingsActivity::class.java))
+        }
+        view.findViewById<TextView>(R.id.btnTimeZoneEntry)?.setOnClickListener {
+            startActivity(Intent(requireContext(), TimeZoneSettingsActivity::class.java))
+        }
+
+        // v9.4.0: 深色模式三态开关（跟随系统/浅色/深色，对齐开发版v9.2.9）
+        setupDarkModeButtons(view)
+    }
+
+    /**
+     * v9.4.0: 深色模式三态开关。点击后保存设置并立即应用（AppCompatDelegate + recreate）。
+     */
+    private fun setupDarkModeButtons(view: View) {
+        val buttons = listOf(
+            R.id.btnDarkFollow to 0,
+            R.id.btnDarkLight to 1,
+            R.id.btnDarkDark to 2
+        )
+        fun refresh() {
+            val cur = prefs.getDarkMode()
+            for ((id, mode) in buttons) {
+                val btn = view.findViewById<TextView>(id) ?: continue
+                val selected = mode == cur
+                btn.setBackgroundResource(if (selected) R.drawable.bg_dark_chip_sel else R.drawable.bg_dark_chip_unsel)
+                btn.setTextColor(
+                    resources.getColor(if (selected) R.color.primary_dark else R.color.text_secondary)
+                )
+            }
+        }
+        for ((id, mode) in buttons) {
+            view.findViewById<TextView>(id)?.setOnClickListener {
+                prefs.setDarkMode(mode)
+                androidx.appcompat.app.AppCompatDelegate.setDefaultNightMode(
+                    when (mode) {
+                        1 -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_NO
+                        2 -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_YES
+                        else -> androidx.appcompat.app.AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                    }
+                )
+                requireActivity().recreate()
+            }
+        }
+        refresh()
+    }
+
+    /**
+     * v8.1.2: 打开存储目录（多级兼容，适配vivo等国产ROM，源自开发版 v7.8.2）
+     * ① content:// 目录URI + 目录MIME（分区存储标准方案）
+     * ② file:// 目录 + 目录MIME（部分ROM/旧系统文件管理器）
+     * ③ 系统文档选择器 DocumentsUI（所有设备兜底，尽量定位到目标目录）
+     */
+    private fun openSaveDir() {
+        val dir = com.jichi.ob.MainActivity.SAVE_DIR
+        try { if (!dir.exists()) dir.mkdirs() } catch (_: Exception) {}
+        val mimeDir = DocumentsContract.Document.MIME_TYPE_DIR // vnd.android.document/directory
+        val rel = dir.absolutePath.removePrefix("/storage/emulated/0/").trimStart('/')
+
+        // ① 首选：content:// 目录URI + 目录MIME
+        try {
+            val uri = DocumentsContract.buildDocumentUri("com.android.externalstorage.documents", "primary:$rel")
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                data = uri
+                type = mimeDir
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            }
+            startActivity(intent); return
+        } catch (_: Exception) {}
+
+        // ② 回退：file:// 目录 + 目录MIME
+        try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(Uri.fromFile(dir), mimeDir)
+                flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+            }
+            startActivity(intent); return
+        } catch (_: Exception) {}
+
+        // ③ 兜底：系统文档选择器 DocumentsUI（所有设备可用），尽量定位到目标目录
+        try {
+            val intent = Intent(Intent.ACTION_OPEN_DOCUMENT_TREE)
+            if (android.os.Build.VERSION.SDK_INT >= 26) {
+                intent.putExtra("android.intent.extra.INITIAL_URI", DocumentsContract.buildDocumentUri(
+                    "com.android.externalstorage.documents", "primary:$rel"))
+            }
+            startActivity(intent); return
+        } catch (_: Exception) {}
+
+        Toast.makeText(requireContext(), "无法直接打开目录，请到文件管理器查看：\n${dir.absolutePath}", Toast.LENGTH_LONG).show()
+    }
+
+    // ===== 源/目标选择 =====
+    private fun platformColor(tag: String): Int = when (tag) {
+        "igp", "igpi" -> requireContext().getColor(R.color.igp_green)
+        "xz" -> requireContext().getColor(R.color.xingzhe_blue)
+        "mg" -> requireContext().getColor(R.color.magene_blue)
+        "bb" -> requireContext().getColor(R.color.blackbird_dark)
+        "br" -> requireContext().getColor(R.color.bryton_red)
+        "gm", "gcn" -> requireContext().getColor(R.color.garmin_blue)
+        "cscn", "cs" -> requireContext().getColor(R.color.coros_red)
+        "wo" -> requireContext().getColor(R.color.wahoo_red)
+        "ob" -> requireContext().getColor(R.color.outbase_orange)
+        "mw" -> requireContext().getColor(R.color.mywhoosh_orange)
+        "zf" -> requireContext().getColor(R.color.zwift_purple)
+        "kp" -> requireContext().getColor(R.color.keep_yellow)
+        "cd" -> requireContext().getColor(R.color.codoon_green)
+        "zp" -> requireContext().getColor(R.color.zepp_blue)
+        "kt" -> requireContext().getColor(R.color.komoot_red)
+        "su" -> requireContext().getColor(R.color.suunto_blue)
+        "2b" -> requireContext().getColor(R.color.twobulu_green)
+        "jr" -> requireContext().getColor(R.color.joyrun_green)
+        else -> requireContext().getColor(R.color.primary)
+    }
+
+    private fun setButtonSelected(btn: MaterialButton, selected: Boolean, tag: String) {
+        if (!btn.isEnabled) {
+            btn.setBackgroundColor(0xFFE8E8E8.toInt())
+            btn.setTextColor(0xFFB0B0B0.toInt())
+            btn.alpha = 0.6f
+            return
+        }
+        btn.alpha = 1.0f
+        if (selected) {
+            btn.setBackgroundColor(platformColor(tag))
+            btn.setTextColor(requireContext().getColor(R.color.white))
+        } else {
+            btn.setBackgroundColor(requireContext().getColor(R.color.grey_light))
+            btn.setTextColor(requireContext().getColor(R.color.text_primary))
+        }
+    }
+
+    /** v8.0.0: 数据来源多选 toggle */
+    private fun setupSourceButtons() {
+        for (i in 0 until gridSource.childCount) {
+            val btn = gridSource.getChildAt(i) as? MaterialButton ?: continue
+            val tag = btn.tag as? String ?: continue
+            btn.setOnClickListener {
+                if (!btn.isEnabled) return@setOnClickListener
+                val ds = DataSource.fromShortName(tag)
+                if (ds == null || !prefs.isLoggedIn(ds)) {
+                    Toast.makeText(requireContext(), "请先登录${ds?.displayName ?: "该平台"}", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                // 多选 toggle
+                if (selectedSourceTags.contains(tag)) selectedSourceTags.remove(tag)
+                else selectedSourceTags.add(tag)
+                refreshSourceButtons()
+            }
+        }
+    }
+
+    private fun refreshSourceButtons() {
+        for (j in 0 until gridSource.childCount) {
+            val b = gridSource.getChildAt(j) as? MaterialButton ?: continue
+            setButtonSelected(b, selectedSourceTags.contains(b.tag as? String ?: ""), b.tag as? String ?: "")
+        }
+        updateSourceCountLabel()
+        updateForceRetransmitState()
+    }
+
+    private fun updateSourceCountLabel() {
+        view?.findViewById<TextView>(R.id.tvSourceHint)?.text =
+            if (selectedSourceTags.isEmpty()) "数据来源 (可多选，点击切换):"
+            else "数据来源 (可多选): 已选 ${selectedSourceTags.size} 个"
+    }
+
+    /** 同步目标：Outbase / Strava 二选一单选，点击任一个，另一个立即取消高亮 */
+    private fun setupTargetButtons() {
+        for (i in 0 until gridTarget.childCount) {
+            val btn = gridTarget.getChildAt(i) as? MaterialButton ?: continue
+            val tag = btn.tag as? String ?: continue
+            btn.setOnClickListener { selectTarget(tag) }
+        }
+        view?.findViewById<TextView>(R.id.tvTargetHint)?.text = "同步目标（Outbase / Strava 二选一）"
+    }
+
+    /** 选中指定目标为唯一同步目标，持久化为单一值并重算两个按钮的选中态 */
+    private fun selectTarget(tag: String) {
+        if (tag != DataSource.OUTBASE.shortName && tag != DataSource.STRAVA.shortName) return
+        selectedTargetTag = tag
+        prefs.setLastTarget(tag)
+        refreshTargetButtons()
+        val ds = DataSource.fromShortName(tag)
+        if (ds != null && !prefs.isLoggedIn(ds)) {
+            Toast.makeText(requireContext(), "尚未登录${ds.displayName}，同步前请先登录${ds.displayName}", Toast.LENGTH_SHORT).show()
+        } else if (tag == DataSource.STRAVA.shortName) {
+            Toast.makeText(requireContext(), "已选择 Strava 为上传目标，账号参数可在下方「Strava 上传设置」中配置", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    /** 按当前唯一选中目标重算网格内所有目标按钮：最多一个高亮 */
+    private fun refreshTargetButtons() {
+        for (j in 0 until gridTarget.childCount) {
+            val b = gridTarget.getChildAt(j) as? MaterialButton ?: continue
+            val t = b.tag as? String ?: continue
+            b.isEnabled = true
+            setButtonSelected(b, t == selectedTargetTag, t)
+        }
+    }
+
+    /** v8.0.0: 忽略记忆强制重传开关状态（用户自选） */
+    private fun updateForceRetransmitState() {
+        val sw = view?.findViewById<SwitchMaterial>(R.id.switchForceRetransmit) ?: return
+        val hint = view?.findViewById<TextView>(R.id.tvForceRetransmitHint) ?: return
+        sw.isEnabled = true
+        sw.isChecked = prefs.isForceRetransmit()
+        hint.text = if (sw.isChecked) "已开启：忽略同步记忆，本次同步将重新上传"
+        else "已关闭：已在同步记忆中的记录将自动跳过"
+    }
+
+    private fun restoreSettings(view: View) {
+        // v8.0.0: 恢复多选来源（过滤未登录平台）
+        selectedSourceTags.clear()
+        selectedSourceTags.addAll(prefs.getLastSources().filter { t ->
+            DataSource.fromShortName(t)?.let { prefs.isLoggedIn(it) } ?: false
+        })
+        for (i in 0 until gridSource.childCount) {
+            val btn = gridSource.getChildAt(i) as? MaterialButton ?: continue
+            val tag = btn.tag as? String ?: continue
+            setButtonSelected(btn, selectedSourceTags.contains(tag), tag)
+        }
+        updateSourceCountLabel()
+        updateSourceChips()
+        // 恢复单选目标（持久化单一值，默认 Outbase），按它高亮唯一按钮
+        selectedTargetTag = prefs.getLastTarget()
+        refreshTargetButtons()
+        // v8.5.9: 迈金两个通道开关分别恢复状态（七牛云默认关 / fit_content 默认开）
+        view.findViewById<SwitchMaterial>(R.id.switchMageneQiniu).isChecked = prefs.isMageneQiniuGcj02Convert()
+        view.findViewById<SwitchMaterial>(R.id.switchMageneFitContent).isChecked = prefs.isMageneFitContentGcj02Convert()
+        val saveDir = view.findViewById<TextView>(R.id.tvSaveDir)
+        try {
+            saveDir.text = com.jichi.ob.MainActivity.SAVE_DIR.absolutePath
+        } catch (e: Exception) {
+            saveDir.text = "下载/哇哇叫"
+        }
+        view.findViewById<TextView>(R.id.tvSyncedCount).text = "已同步: ${prefs.getSyncedCount()} 条"
+        updateForceRetransmitState()
+        initDateCutoff(view)
+    }
+
+    /** v8.1.0: 日期截止过滤 —— 开启后只同步指定日期之前的数据 */
+    private fun initDateCutoff(view: View) {
+        val sw = view.findViewById<SwitchMaterial>(R.id.switchDateCutoff) ?: return
+        val tv = view.findViewById<TextView>(R.id.tvCutoffDate) ?: return
+        val hint = view.findViewById<TextView>(R.id.tvCutoffHint) ?: return
+        val defaultDate = "2020-01-01"
+        fun refreshCutoff() {
+            val enabled = prefs.isDateCutoffEnabled()
+            val date = prefs.getCutoffDate().ifBlank { defaultDate }
+            sw.isChecked = enabled
+            tv.text = if (enabled) "截止 $date" else "点击选择日期"
+            hint.text = if (enabled) "已开启：仅同步 $date 之前的数据，之后的数据将被跳过"
+            else "关闭：同步全部数据（不按日期过滤）"
+        }
+        refreshCutoff()
+        sw.setOnCheckedChangeListener { _, b ->
+            prefs.setDateCutoffEnabled(b)
+            refreshCutoff()
+        }
+        tv.setOnClickListener {
+            val parts = prefs.getCutoffDate().ifBlank { defaultDate }.split("-")
+            val y = parts.getOrNull(0)?.toIntOrNull() ?: 2020
+            val m = parts.getOrNull(1)?.toIntOrNull()?.minus(1) ?: 0
+            val d = parts.getOrNull(2)?.toIntOrNull() ?: 1
+            val picker = android.app.DatePickerDialog(requireContext(), { _, yy, mm, dd ->
+                prefs.setCutoffDate(String.format("%04d-%02d-%02d", yy, mm + 1, dd))
+                prefs.setDateCutoffEnabled(true)
+                refreshCutoff()
+            }, y, m, d)
+            picker.show()
+        }
+    }
+
+    /** 登录态变化后刷新目标按钮：仍按当前唯一选中目标高亮，最多一个 */
+    private fun updateTargetChips() {
+        refreshTargetButtons()
+    }
+
+    /**
+     * v8.4.3: 来源网格未登录平台直接隐藏不显示（已登录才展示）
+     * v8.8.6: 改为重建式——GridLayout 中 GONE 不释放网格单元会留下空洞，
+     * 改为按已登录平台列表动态重建按钮，从左到右紧凑填充补齐空缺。
+     */
+    private fun updateSourceChips() {
+        val saved = selectedSourceTags.toSet()
+        gridSource.removeAllViews()
+        val loggedIn = DataSource.sourcePlatforms().filter { prefs.isLoggedIn(it) }
+        for (ds in loggedIn) {
+            val btn = createSourceChip(ds)
+            btn.setOnClickListener {
+                if (!btn.isEnabled) return@setOnClickListener
+                val tag = btn.tag as? String ?: return@setOnClickListener
+                val d = DataSource.fromShortName(tag)
+                if (d == null || !prefs.isLoggedIn(d)) {
+                    Toast.makeText(requireContext(), "请先登录${d?.displayName ?: "该平台"}", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                if (selectedSourceTags.contains(tag)) selectedSourceTags.remove(tag)
+                else selectedSourceTags.add(tag)
+                refreshSourceButtons()
+            }
+            gridSource.addView(btn, sourceChipLayoutParams())
+            setButtonSelected(btn, saved.contains(ds.shortName), ds.shortName)
+        }
+    }
+
+    private fun sourceChipLayoutParams(): GridLayout.LayoutParams {
+        val d = resources.displayMetrics.density
+        return GridLayout.LayoutParams().apply {
+            width = 0
+            height = (44 * d).toInt()
+            columnSpec = GridLayout.spec(GridLayout.UNDEFINED, 1f)
+            setMargins((3 * d).toInt(), (3 * d).toInt(), (3 * d).toInt(), (3 * d).toInt())
+        }
+    }
+
+    private fun createSourceChip(ds: DataSource): MaterialButton =
+        MaterialButton(requireContext()).apply {
+            insetTop = 0
+            insetBottom = 0
+            minHeight = 0
+            minWidth = 0
+            text = ds.displayName
+            textSize = 12f
+            maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            gravity = android.view.Gravity.CENTER
+            tag = ds.shortName
+            cornerRadius = 14
+            backgroundTintList = android.content.res.ColorStateList.valueOf(
+                if (ds == DataSource.IGPSPORT_INT) requireContext().getColor(R.color.igp_green)
+                else platformColor(ds.shortName)
+            )
+            setTextColor(requireContext().getColor(R.color.white))
+        }
+
+    /** v8.0.0: 登录状态变化后刷新设置页 */
+    fun refreshLoginState() {
+        try {
+            updateSourceChips()
+            // 清理来源中未登录的平台
+            selectedSourceTags.removeAll { t ->
+                val ds = DataSource.fromShortName(t)
+                ds == null || !prefs.isLoggedIn(ds)
+            }
+            updateSourceCountLabel()
+            updateTargetChips()
+            updateForceRetransmitState()
+        } catch (e: Exception) {
+            // 忽略刷新异常
+        }
+    }
+
+    // v7.6.2: 手动输入数值（滑块+输入框联动）
+    private fun showInputDialog(title: String, slider: Slider, tv: TextView, min: Int, max: Int) {
+        val input = android.widget.EditText(requireContext())
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+        input.setText(slider.value.toInt().toString())
+        input.selectAll()
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        input.setPadding(pad, pad, pad, pad)
+        androidx.appcompat.app.AlertDialog.Builder(requireContext())
+            .setTitle(title)
+            .setView(input)
+            .setPositiveButton("确定") { _, _ ->
+                val v = input.text.toString().toIntOrNull()
+                if (v != null) {
+                    val clamped = v.coerceIn(min, max)
+                    slider.value = clamped.toFloat()
+                    tv.text = clamped.toString()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    // ===== MainActivity调用 =====
+    /** v8.0.0: 多对一 - 返回所有勾选的数据来源 */
+    fun getSelectedSources(): List<DataSource> =
+        selectedSourceTags.mapNotNull { DataSource.fromShortName(it) }
+    /** 返回当前单选的同步目标（Outbase / Strava），兜底 Outbase */
+    fun getTarget(): DataSource = DataSource.fromShortName(selectedTargetTag) ?: DataSource.OUTBASE
+    fun getCount(): Int = requireView().findViewById<Slider>(R.id.sliderCount).value.toInt()
+    fun getSkip(): Int = requireView().findViewById<Slider>(R.id.sliderSkip).value.toInt()
+    fun setSyncedCount(n: Int) {
+        view?.findViewById<TextView>(R.id.tvSyncedCount)?.text = "已同步: $n 条"
+    }
+    fun setSaveDir(path: String) {
+        view?.findViewById<TextView>(R.id.tvSaveDir)?.text = path
+    }
+}

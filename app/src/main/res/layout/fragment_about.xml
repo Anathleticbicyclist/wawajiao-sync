@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg_light"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="12dp">
+
+        <!-- v8.1.2: 品牌区（Logo左 + 名称/slogan/版本 + 检查更新最右侧，白卡一行） -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="6dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="1dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="12dp">
+
+                <ImageView
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:src="@drawable/ic_about_logo"
+                    android:background="@drawable/bg_about_logo_circle"
+                    android:clipToOutline="true"
+                    android:contentDescription="logo" />
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="12dp"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="哇哇叫"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:text="让运动数据自由流动"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="12sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="1dp"
+                        android:text="@string/brand_based_on"
+                        android:textColor="@color/text_tertiary"
+                        android:textSize="10sp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="v1.0.0"
+                        android:textColor="@color/primary_dark"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <!-- 检查更新：白卡最右侧，与周围融合 -->
+                <TextView
+                    android:id="@+id/btnCheckUpdate"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/bg_check_update"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:paddingStart="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingEnd="12dp"
+                    android:paddingBottom="6dp"
+                    android:text="检查更新"
+                    android:textColor="@color/primary"
+                    android:textSize="11sp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- v8.4.0: 功能横条：数据合并 -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/cardMerge"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:layout_marginBottom="8dp"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?android:attr/selectableItemBackground"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="@color/primary_light"
+            app:strokeColor="@color/primary"
+            app:strokeWidth="1dp">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="14dp">
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="🗂 数据合并"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="合并多段轨迹 →"
+                    android:textSize="12sp"
+                    android:textColor="@color/primary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 一句话介绍 -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:padding="10dp"
+            android:background="@color/card_white" android:layout_marginStart="4dp" android:layout_marginEnd="4dp"
+            android:gravity="center"
+            android:text="本项目完全开源免费，如觉得项目对你有帮助，可赞赏支持作者后续功能迭代与问题修复。"
+            android:textColor="@color/text_primary"
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp" />
+
+<!-- 链接卡片（俱乐部 + 更新地址）-->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:layout_marginBottom="6dp"
+            app:cardCornerRadius="14dp" app:cardElevation="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="6dp">
+                <TextView android:id="@+id/tvClubLink" android:layout_width="match_parent" android:layout_height="44dp" android:gravity="center_vertical" android:text="👥 哇哇叫同步工具：开发者俱乐部" android:textColor="@color/text_primary" android:textSize="12sp" android:paddingStart="8dp" android:paddingEnd="8dp" />
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="@color/bg_line" />
+                <TextView android:id="@+id/tvUpdateLink" android:layout_width="match_parent" android:layout_height="44dp" android:gravity="center_vertical" android:text="🌐 更新地址：哇哇叫 正式版 · Github项目" android:textColor="@color/text_primary" android:textSize="12sp" android:paddingStart="8dp" android:paddingEnd="8dp" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 鸣谢开源项目（仅两个项目） -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" android:layout_marginBottom="8dp"
+            app:cardCornerRadius="14dp" app:cardElevation="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="@string/about_oss_title" android:textSize="14sp" android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:text="@string/about_oss_1_name" android:textSize="13sp"
+                    android:textStyle="bold" android:textColor="@color/text_primary" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp" android:text="@string/about_oss_1_desc" android:textSize="11sp"
+                    android:textColor="@color/text_secondary" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:text="@string/about_oss_2_name" android:textSize="13sp"
+                    android:textStyle="bold" android:textColor="@color/text_primary" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp" android:text="@string/about_oss_2_desc" android:textSize="11sp"
+                    android:textColor="@color/text_secondary" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:lineSpacingExtra="2dp"
+                    android:text="@string/about_oss_note" android:textSize="11sp"
+                    android:textColor="@color/text_secondary" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:lineSpacingExtra="2dp"
+                    android:text="@string/about_copyright" android:textSize="10sp"
+                    android:textColor="@color/primary_dark" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 风险与免责 -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="14dp" app:cardElevation="1dp"
+            app:strokeColor="@color/warn_orange" app:strokeWidth="1dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="12dp">
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="@string/about_risk_title" android:textSize="14sp" android:textStyle="bold"
+                    android:textColor="@color/warn_dark" />
+                <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp" android:lineSpacingExtra="3dp"
+                    android:text="@string/about_risk_body" android:textSize="11sp"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- 赞赏（微信+支付宝并列） -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:layout_marginTop="4dp"
+            android:text="赞赏支持"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp"
+            android:textStyle="bold" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal"
+            android:gravity="center">
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="4dp">
+                <ImageView android:layout_width="150dp" android:layout_height="150dp" android:src="@drawable/reward_wechat" android:contentDescription="微信赞赏码" android:adjustViewBounds="true" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="微信赞赏码" android:textSize="11sp" android:textColor="@color/text_secondary" android:layout_marginTop="2dp" />
+            </LinearLayout>
+            <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="center" android:padding="4dp">
+                <ImageView android:layout_width="130dp" android:layout_height="wrap_content" android:src="@drawable/reward_alipay" android:contentDescription="支付宝收款码" android:adjustViewBounds="true" />
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="支付宝收款码" android:textSize="11sp" android:textColor="@color/text_secondary" android:layout_marginTop="2dp" />
+            </LinearLayout>
+        </LinearLayout>
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="4dp"
+            android:text="本项目完全开源免费，您的赞赏将支持后续功能迭代与问题修复"
+            android:textColor="@color/text_secondary"
+            android:textSize="10sp" />
+
+        <!-- v8.1.2: 开源软件免责声明超链接（小字、居中、蓝色、可点击弹窗） -->
+        <TextView
+            android:id="@+id/tvDisclaimerLink"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:layout_marginTop="2dp"
+            android:layout_marginBottom="8dp"
+            android:text="📜 开源软件免责声明"
+            android:textColor="@color/primary"
+            android:textSize="9sp"
+            android:clickable="true"
+            android:focusable="true" />
+    </LinearLayout>
+</ScrollView>

@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 哇哇叫 v1.0.0 · Strava 上传设置页 + 关于页新增文案 -->
+
+    <!-- Strava 入口 -->
+    <string name="strava_entry_title">Strava 上传设置</string>
+    <string name="strava_entry_hint">登录后把运动记录同步到 Strava（网页接口）</string>
+
+    <!-- 账号与登录态 -->
+    <string name="strava_settings_title">Strava 上传设置</string>
+    <string name="strava_account_section">账号</string>
+    <string name="strava_empty_title">还没有连接 Strava</string>
+    <string name="strava_empty_desc">登录 Strava 后，同步时选中的运动记录会一起上传到 Strava。</string>
+    <string name="strava_btn_login">登录 Strava</string>
+    <string name="strava_logged_in_as">已登录：%1$s</string>
+    <string name="strava_last_upload_label">上次上传</string>
+    <string name="strava_never_uploaded">尚未上传过记录</string>
+    <string name="strava_btn_test_session">测试会话有效性</string>
+    <string name="strava_session_checking">正在检测会话…</string>
+    <string name="strava_session_valid">会话有效，可以正常上传</string>
+    <string name="strava_session_expired">会话已过期或失效，请重新登录 Strava</string>
+    <string name="strava_session_rate_limited">Strava 限流了，请稍后再试；仍失败可在浏览器登录后再回来</string>
+    <string name="strava_session_error">检测未完成：%1$s。请检查网络后重试，或重新登录</string>
+    <string name="strava_btn_logout">退出登录</string>
+    <string name="strava_logout_title">退出 Strava 登录？</string>
+    <string name="strava_logout_msg">退出后需要重新登录才能继续上传，设备上的 Cookie 会被清除。</string>
+
+    <!-- 上传参数 -->
+    <string name="strava_params_section">上传参数</string>
+    <string name="strava_poll_interval">轮询间隔</string>
+    <string name="strava_poll_interval_hint">上传后每隔多久查一次处理进度，默认 2 秒</string>
+    <string name="strava_poll_retry">最大重试次数</string>
+    <string name="strava_poll_retry_hint">超过次数仍未处理完即记为「待确认」，下次自动重试，默认 12 次</string>
+    <string name="strava_dedup">跳过已上传的记录</string>
+    <string name="strava_dedup_hint">开启后，同一活动同一份文件不会重复上传</string>
+
+    <!-- 诊断与最近记录 -->
+    <string name="strava_diag_section">诊断信息</string>
+    <string name="strava_diag_cookie">登录 Cookie</string>
+    <string name="strava_diag_cookie_saved">已保存（%1$d 字节）</string>
+    <string name="strava_diag_cookie_none">未保存</string>
+    <string name="strava_diag_params">当前参数：每 %1$d 毫秒查一次，最多 %2$d 次</string>
+    <string name="strava_dedup_on">去重：开启</string>
+    <string name="strava_dedup_off">去重：关闭</string>
+
+    <!-- 上传状态 -->
+    <string name="strava_state_uploading">正在上传…</string>
+    <string name="strava_state_success">上传成功</string>
+    <string name="strava_state_failed">上传失败</string>
+    <string name="strava_state_pending">已上传，Strava 还在处理</string>
+
+    <!-- 风险提示 -->
+    <string name="strava_risk_section">风险提示</string>
+    <string name="strava_risk_body">Strava 上传走的是网页接口，不是官方开放 API，可能随时变更、限流或失效；账号存在风控风险。请自行判断是否使用。</string>
+
+    <!-- 关于页 -->
+    <string name="about_oss_title">鸣谢开源项目</string>
+    <string name="about_oss_1_name">鸡翅幸哲迈进OB</string>
+    <string name="about_oss_1_desc">Anathleticbicyclist · MIT License</string>
+    <string name="about_oss_2_name">顽爪爪 WanSync</string>
+    <string name="about_oss_2_desc">Tyan66666 · Strava 网页上传协议参考</string>
+    <string name="about_oss_note">以上均为独立开源项目，与本软件无从属关系，仅借鉴其公开思路与协议实现。</string>
+    <string name="about_copyright">LICENSE · MIT License｜Copyright (c) 2026 Anathleticbicyclist\n本软件基于「迈进OB」改造，依 MIT 协议保留原作者版权声明与许可条款全文。</string>
+    <string name="about_risk_title">风险与免责</string>
+    <string name="about_risk_body">① 第三方平台均为非官方接口，可能随时变更或失效；\n② 账号存在风控、限流甚至封禁风险；\n③ 同步后的数据准确性不作担保，请以平台官方数据为准；\n④ 登录凭证与运动数据请自行备份；\n⑤ 商用或再分发前请自行确认授权与合规性。</string>
+
+    <!-- 品牌区 -->
+    <string name="brand_based_on">基于 迈进OB 改造</string>
+    <string name="brand_slogan">让运动数据自由流动</string>
+</resources>

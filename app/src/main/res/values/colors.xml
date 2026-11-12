@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 哇哇叫 v1.0.0：logo 橙 #FC4C02 基调（扁平化） -->
+    <color name="bg_light">#FDF8F4</color>          <!-- 页面背景：暖白带橙意 -->
+    <color name="primary">#FC4C02</color>           <!-- 主色：Strava 橙 -->
+    <color name="primary_dark">#C93A00</color>
+    <color name="primary_soft">#FFF1EB</color>      <!-- 主色浅底 -->
+    <color name="gradient_start">#FF9A5A</color>    <!-- 强调渐变起始：浅橙 -->
+    <color name="gradient_end">#FC4C02</color>      <!-- 强调渐变结束：主色 -->
+    <color name="splash_start">#FFF3EA</color>      <!-- 开屏渐变起始：极浅橙 -->
+    <color name="splash_mid">#FF9257</color>        <!-- 开屏渐变中间：橙 -->
+    <color name="splash_end">#FC4C02</color>        <!-- 开屏渐变结束：logo 橙 -->
+    <color name="card_white">#FFFFFF</color>        <!-- 卡片白 -->
+    <color name="divider">#F0E4DC</color>           <!-- 细分割线（橙色系暖灰） -->
+    <color name="primary_light">#FFF0E6</color>     <!-- 主色浅底（选中态） -->
+    <color name="log_success">#2E9E5B</color>       <!-- v9.2.8 成功：绿（对齐开发版） -->
+    <color name="log_error">#E5484D</color>         <!-- v8.4.0 失败：红 -->
+    <color name="log_skip">#9CA3AF</color>          <!-- v9.2.8 跳过：灰（对齐开发版） -->
+    <color name="log_info">#2B8CFF</color>          <!-- v8.4.0 信息/传输：天蓝 -->
+    <color name="log_warn">#E8A33D</color>          <!-- v8.4.0 警告：橙 -->
+    <color name="log_normal">#4B5563</color>        <!-- v9.2.8 普通：中灰（对齐开发版） -->
+    <color name="log_time">#B6C2D0</color>          <!-- v9.2.8 时间戳：浅灰（对齐开发版） -->
+    <color name="text_primary">#17181A</color>
+    <color name="text_secondary">#8A919C</color>
+    <color name="text_tertiary">#B4BAC4</color>
+    <color name="grey_light">#F6EFEA</color>
+    <color name="bg_line">#F3E8E1</color>          <!-- 分隔线 -->
+    <color name="bg_card_sub">#FBEFE7</color>     <!-- 次级按钮/浅底 -->
+    <color name="warn_dark">#D9830B</color>       <!-- 橙色深字 -->
+
+    <!-- 状态色 -->
+    <color name="ok_green">#2FBD71</color>
+    <color name="ok_soft">#E6F7EE</color>
+    <color name="err_red">#F0443A</color>
+    <color name="err_soft">#FDEBE9</color>
+    <color name="warn_orange">#FF9F2E</color>
+    <color name="warn_soft">#FFF4E5</color>
+
+    <!-- 平台官方品牌色（网络调研确认） -->
+    <color name="igp_green">#FF5A00</color>         <!-- iGPSPORT 迹驰：橙红（i上红点） -->
+    <color name="xingzhe_blue">#1989FA</color>      <!-- 行者：蓝 -->
+    <color name="magene_blue">#2B6CB0</color>       <!-- 顽鹿/迈金：蓝 -->
+    <color name="outbase_orange">#FF6B00</color>    <!-- Outbase：橙 -->
+    <color name="garmin_blue">#003B70</color>       <!-- 佳明：深蓝 -->
+    <color name="coros_red">#E54B3B</color>         <!-- 高驰：红 -->
+    <color name="wahoo_red">#E60012</color>         <!-- Wahoo：红 -->
+    <color name="blackbird_dark">#2c3e50</color>    <!-- 黑鸟：深灰（图标绿底） -->
+    <color name="blackbird_green">#4CAF50</color>   <!-- 黑鸟：绿 -->
+    <color name="bryton_red">#00A651</color>        <!-- 百锐腾 Bryton：绿（官方） -->
+    <color name="mywhoosh_orange">#E8590C</color>   <!-- MyWhoosh：橙 -->
+    <color name="zwift_purple">#6A2FA0</color>      <!-- Zwift：紫 -->
+    <color name="keep_yellow">#FFB800</color>
+    <!-- v8.3.8: 咕咚/Zepp/Komoot/松拓（对齐开发版 v8.3.3）-->
+    <color name="codoon_green">#00B4A0</color>
+    <color name="zepp_blue">#3457D5</color>
+    <color name="komoot_red">#E23135</color>
+    <color name="suunto_blue">#1E88E5</color>       <!-- Keep：品牌黄 -->
+    <color name="twobulu_green">#2E8B57</color>        <!-- 两步路：绿色 -->
+    <color name="joyrun_green">#00B578</color>        <!-- 悦跑圈：绿色 -->
+    <color name="giant_blue">#2A6FD6</color>         <!-- 捷安特 Giant -->
+    <color name="intervals_icu_orange">#F57C00</color> <!-- Intervals.icu -->
+
+
+    <!-- 基础色 -->
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="green">#2FBD71</color>
+    <color name="red">#F0443A</color>
+
+    <!-- v9.4.0 深色模式资源化：布局硬编码色转命名色 -->
+    <color name="accent_orange">#E65100</color>     <!-- 重点橙（登录Web输入框等） -->
+    <color name="stroke_light">#F6DFD2</color>      <!-- 浅橙描边（输入框/卡片） -->
+    <color name="stroke_chip">#F0C7B2</color>       <!-- 胶囊描边 -->
+    <color name="text_mid">#666666</color>         <!-- 中灰文字 -->
+    <color name="text_light">#999999</color>       <!-- 浅灰文字 -->
+    <color name="text_deep">#333333</color>        <!-- 深灰文字 -->
+</resources>
