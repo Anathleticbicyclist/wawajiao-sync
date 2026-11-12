@@ -1,6 +1,6 @@
 # 🚴 迈向Ob（正式版）
 
-<p align="center"><img src="logo.png" alt="迈向Ob" width="120"></p>
+<p align="center"><img src="迈进OB-原始logo.png" alt="迈向Ob" width="120"></p>
 
 **多平台运动数据 → Outbase 一键迁移工具**
 
