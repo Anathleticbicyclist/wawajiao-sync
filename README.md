@@ -1,5 +1,21 @@
 # 哇哇叫 · 运动数据同步工具
 
+> ## 维护状态说明
+>
+> **这个项目我不再继续维护了。**
+>
+> 但不影响任何人继续用：代码、文档、Release 包都留在这里，随时可以 clone、fork、提 PR、自己改着用，不用问我。
+>
+> **已经发出去的版本照常能用**，功能不受影响。
+>
+> 如果哪天遇到平台改版、登录失败这类问题，可以先试试下面几个同类项目，都比我这个更活跃：
+>
+> 1️⃣ **鸡翅幸哲迈进Ob**（开发体验版）— https://github.com/Anathleticbicyclist/sports-data-sync-multiplatform
+> 2️⃣ **迈进Ob**（正式版）— https://github.com/Anathleticbicyclist/sync-igpsport-magene-onelap-xingzhe-data-to-outbase
+> 3️⃣ **顽爪爪同步**（WanSync）— https://github.com/Tyan66666/WanSync
+>
+> 感谢遇见。
+
 <p align="center">
   <img src="docs/logo-wawajiao.png" alt="哇哇叫" width="120">
 </p>
