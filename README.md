@@ -10,9 +10,9 @@
 >
 > 如果哪天遇到平台改版、登录失败这类问题，可以先试试下面几个同类项目，都比我这个更活跃：
 >
-> 1️⃣ **鸡翅幸哲迈进Ob**（开发体验版）— https://github.com/Anathleticbicyclist/sports-data-sync-multiplatform
-> 2️⃣ **迈进Ob**（正式版）— https://github.com/Anathleticbicyclist/sync-igpsport-magene-onelap-xingzhe-data-to-outbase
-> 3️⃣ **顽爪爪同步**（WanSync）— https://github.com/Tyan66666/WanSync
+> 1. [鸡翅幸哲迈进Ob（开发体验版）](https://github.com/Anathleticbicyclist/sports-data-sync-multiplatform)
+> 2. [迈进Ob（正式版）](https://github.com/Anathleticbicyclist/sync-igpsport-magene-onelap-xingzhe-data-to-outbase)
+> 3. [顽爪爪同步（WanSync）](https://github.com/Tyan66666/WanSync)
 >
 > 感谢遇见。
 
